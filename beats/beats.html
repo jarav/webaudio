@@ -21,7 +21,7 @@
                 text-align: center;
             }
         </style>
-        <script type="text/javascript" src="../../common/coffee-script.js"></script>
+        <script type="text/javascript" src="../../../javascript/common/coffee-script.js"></script>
         <script type="text/coffeescript">
             TWOPI = 2*Math.PI
             sin = Math.sin
@@ -33,7 +33,7 @@
                 start_stop_btn = document.getElementById("start_stop_btn")
                 canvas = document.getElementById("canvas")
                 draw_context = canvas.getContext("2d")
-                draw_context.fillStyle = "#fff"
+                draw_context.fillStyle = "white"
                 canvas_width = canvas.width
                 canvas_height = canvas.height
 
@@ -42,16 +42,21 @@
                 wave_amp = 24.0
                 vel = 300
                 phase_1 = phase_2 = 0.0
-                freq_1 = freq_2 = 440
+                freq_1 = 440
+                freq_2 = 441
                 audio_context = new webkitAudioContext()
-                audio_node = audio_context.createJavaScriptNode(2048, 0, 1)
-                omg_1 = omg_2 = TWOPI * freq_1
-                k1 = k2 = omg_1/(vel*canvas_width)
-                phase1_inc = phase2_inc = omg_1/audio_context.sampleRate
+                audio_node = audio_context.createJavaScriptNode(2048, 2, 2)
+                omg_1 = TWOPI * freq_1
+                omg_2 = TWOPI * freq_2
+                k1 = omg_1/(vel*canvas_width)
+                k2 = omg_2/(vel*canvas_width)
+                phase1_inc = omg_1/audio_context.sampleRate
+                phase2_inc = omg_2/audio_context.sampleRate
                 y_orig_1 = 2.0 + wave_amp
                 y_orig_2 = y_orig_1
                 y_orig_3 = canvas_height - 2.0 - 2.0*wave_amp
                 t = 0
+                last_time = 0.0
                 tick = ->
 
                 audioProcess = (ae) ->
@@ -75,12 +80,15 @@
                         playing = true
                         start_stop_btn.value = "Stop"
                         audio_node.connect(audio_context.destination)
-                        tick = ->
+                        tick = (time) ->
                                 webkitRequestAnimationFrame(tick)
-                                t += 0.00002
+                                #t += 0.00002
+                                t += (time - last_time)
+                                last_time = time
                                 draw()
                                 return
-                        tick()
+                        last_time = Date.now()
+                        webkitRequestAnimationFrame(tick)
 
                 onSldrChange = (e) ->
                     target = e.target
@@ -114,8 +122,9 @@
                     wave_1_data = []
                     wave_2_data = []
                     wave_3_data = []
-                    time_phase_1 = omg_1*t
-                    time_phase_2 = omg_2*t
+                    anim_factor = 0.000002
+                    time_phase_1 = omg_1*t*anim_factor
+                    time_phase_2 = omg_2*t*anim_factor
                     for x in [0..canvas_width] by 2
                         displcmnt_1 = wave_amp*sin( k1*x  - time_phase_1 )
                         displcmnt_2 = wave_amp*sin( k2*x  - time_phase_2 )
