@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Beats</title>
+        <style>
+            .vslider {
+                -webkit-appearance: slider-vertical;
+                width: 20px;
+                height: 180px;
+                display: block;
+            }
+
+            #blk_lbl {
+                display: block;
+            }
+
+            #frm {
+                width: 450px;
+                background-color: #ccc;
+                text-align: center;
+            }
+        </style>
+        <script type="text/javascript" src="./js/coffee-script.js"></script>
+        <script type="text/coffeescript">
+            TWOPI = 2*Math.PI
+            sin = Math.sin
+            window.init = ->
+                freq_1_sldr = document.getElementById("freq_1_sldr")
+                freq_2_sldr = document.getElementById("freq_2_sldr")
+                freq_1_lbl = document.getElementById("freq_1_lbl")
+                freq_2_lbl = document.getElementById("freq_2_lbl")
+                start_stop_btn = document.getElementById("start_stop_btn")
+                canvas = document.getElementById("canvas")
+                draw_context = canvas.getContext("2d")
+                draw_context.fillStyle = "white"
+                canvas_width = canvas.width
+                canvas_height = canvas.height
+
+                playing = false
+                amp = 0.4
+                wave_amp = 24.0
+                vel = 300
+                phase_1 = phase_2 = 0.0
+                freq_1 = 440
+                freq_2 = 441
+                audio_context = new webkitAudioContext()
+                audio_node = audio_context.createJavaScriptNode(2048, 2, 2)
+                omg_1 = TWOPI * freq_1
+                omg_2 = TWOPI * freq_2
+                k1 = omg_1/(vel*canvas_width)
+                k2 = omg_2/(vel*canvas_width)
+                phase1_inc = omg_1/audio_context.sampleRate
+                phase2_inc = omg_2/audio_context.sampleRate
+                y_orig_1 = 2.0 + wave_amp
+                y_orig_2 = y_orig_1
+                y_orig_3 = canvas_height - 2.0 - 2.0*wave_amp
+                t = 0
+                last_time = 0.0
+                tick = ->
+
+                audioProcess = (ae) ->
+                    chnl_data_0 = ae.outputBuffer.getChannelData(0)
+                    chnl_data_1 = ae.outputBuffer.getChannelData(1)
+                    data_length = chnl_data_0.length
+                    for i in [0...data_length]
+                        chnl_data_0[i] = chnl_data_1[i] = amp*(sin(phase_1) + sin(phase_2))
+                        phase_1 = ( phase_1 + phase1_inc ) % TWOPI
+                        phase_2 = ( phase_2 + phase2_inc ) % TWOPI
+
+                audio_node.onaudioprocess = audioProcess
+
+                onClick = (me) ->
+                    if playing is true
+                        playing = false
+                        start_stop_btn.value = "Start"
+                        audio_node.disconnect()
+                        tick = ->
+                    else
+                        playing = true
+                        start_stop_btn.value = "Stop"
+                        audio_node.connect(audio_context.destination)
+                        tick = (time) ->
+                                webkitRequestAnimationFrame(tick)
+                                #t += 0.00002
+                                t += (time - last_time)
+                                last_time = time
+                                draw()
+                                return
+                        last_time = Date.now()
+                        webkitRequestAnimationFrame(tick)
+
+                onSldrChange = (e) ->
+                    target = e.target
+                    switch target
+                        when freq_1_sldr
+                            freq_1 = parseInt(target.value)
+                            freq_1_lbl.value = target.value
+                            omg_1 = TWOPI * freq_1
+                            k1 = omg_1/(vel*canvas_width)
+                            phase1_inc = omg_1/audio_context.sampleRate
+                        when freq_2_sldr
+                            freq_2 = parseInt(target.value)
+                            freq_2_lbl.value = target.value
+                            omg_2 = TWOPI * freq_2
+                            k2 = omg_2/(vel*canvas_width)
+                            phase2_inc = omg_2/audio_context.sampleRate
+                    t = 0.0
+                    draw()
+
+                strokePath = (pts, stroke_style) ->
+                    [ [ x0, y0 ], pts_rest ] = [ pts[0], pts[1..] ]
+                    draw_context.strokeStyle = stroke_style
+                    draw_context.beginPath()
+                    draw_context.moveTo( x0, y0)
+                    for [ x, y ] in pts_rest
+                        draw_context.lineTo(x, y)
+                    draw_context.stroke()
+
+                draw = ->
+                    draw_context.fillRect(0, 0, canvas_width, canvas_height)
+                    wave_1_data = []
+                    wave_2_data = []
+                    wave_3_data = []
+                    anim_factor = 0.000002
+                    time_phase_1 = omg_1*t*anim_factor
+                    time_phase_2 = omg_2*t*anim_factor
+                    for x in [0..canvas_width] by 2
+                        displcmnt_1 = wave_amp*sin( k1*x  - time_phase_1 )
+                        displcmnt_2 = wave_amp*sin( k2*x  - time_phase_2 )
+                        wave_1_data.push([x, y_orig_1 - displcmnt_1])
+                        wave_2_data.push([x, y_orig_2 - displcmnt_2])
+                        wave_3_data.push([x, y_orig_3 - displcmnt_1 - displcmnt_2])
+                    strokePath(wave_1_data, "#f00")
+                    strokePath(wave_2_data, "#00f")
+                    strokePath(wave_3_data, "#0f0")
+
+                freq_1_sldr.addEventListener("change",onSldrChange)
+                freq_2_sldr.addEventListener("change",onSldrChange)
+                start_stop_btn.addEventListener("click", onClick)
+                draw()
+        </script>
+    </head>
+    <body onload="window.init()">
+        <form id="frm">
+            <output class="blk_lbl" style="float:left;" id="freq_1_lbl">440</output>
+            <output class="blk_lbl" style="float:right;" id="freq_2_lbl">440</output>
+            <br/>
+            <input class="vslider" style="float:left;" id="freq_1_sldr" type="range" min="200" max="1000" step="1" value="440" />
+            <canvas id="canvas" style="border: 1px solid;" width="300" height="150" ></canvas>
+            <input class="vslider" style="float:right;" id="freq_2_sldr" type="range" min="200" max="1000" step="1" value="440" />
+            <br/>
+            <input id="start_stop_btn" type="button" value="Start" />
+        </form>
+    </body>
+</html>
